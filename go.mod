@@ -1,6 +1,6 @@
 module github.com/shishirshetty77/KubeSentinel
 
-go 1.25.5
+go 1.23.0
 
 require (
 	k8s.io/api v0.34.3
