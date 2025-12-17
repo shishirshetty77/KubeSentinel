@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: crash-test-app
+  namespace: default
+  labels:
+    app: crash-test
+spec:
+  containers:
+    - name: crash-app
+      image: busybox
+      command: ["/bin/sh", "-c", "echo 'Simulating a memory leak...'; sleep 5; exit 1"]
+      resources:
+        limits:
+          memory: "10Mi"
+      restartPolicy: Always
