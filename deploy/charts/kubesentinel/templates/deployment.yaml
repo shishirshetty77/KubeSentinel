@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubesentinel
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: kubesentinel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kubesentinel
+  template:
+    metadata:
+      labels:
+        app: kubesentinel
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      containers:
+        - name: agent
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          env:
+            - name: AI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: kubesentinel-secrets
+                  key: api-key
+                  optional: true

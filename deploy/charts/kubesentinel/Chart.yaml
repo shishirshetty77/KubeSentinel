@@ -1,0 +1,6 @@
+apiVersion: v2
+name: kubesentinel
+description: A Helm chart for KubeSentinel AI SRE Agent
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
