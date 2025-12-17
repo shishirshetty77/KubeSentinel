@@ -6,34 +6,68 @@ import (
 	"strings"
 )
 
-// AIProvider defines the interface for different LLMs (Gemini, OpenAI, etc.)
-type AIProvider interface {
-	AnalyzeLog(ctx context.Context, logs string, errorReason string) (string, error)
+// Provider defines the interface for log analysis engines.
+type Provider interface {
+	Analyze(ctx context.Context, logs string, reason string) (*Result, error)
 }
 
-// MockProvider is a placeholder that returns static analysis
-type MockProvider struct{}
-
-func (m *MockProvider) AnalyzeLog(ctx context.Context, logs string, errorReason string) (string, error) {
-	// In a real implementation, you would make an HTTP POST to OpenAI/Gemini here.
-
-	// Simple heuristic for demo purposes
-	if strings.Contains(logs, "panic") {
-		return "⚠️ **Root Cause:** Application Panic.\n✅ **Fix:** Check code for nil pointer dereference or unhandled errors. See logs for stack trace.", nil
-	}
-	if strings.Contains(logs, "OutOfMemory") || errorReason == "OOMKilled" {
-		return "⚠️ **Root Cause:** Memory Limit Exceeded.\n✅ **Fix:** Increase `resources.limits.memory` in deployment YAML.", nil
-	}
-
-	return "⚠️ **Root Cause:** Unknown Application Error.\n✅ **Fix:** Check logs for more details.", nil
+// Result contains the structural diagnosis.
+type Result struct {
+	RootCause string
+	Severity  string
+	Fix       string
 }
 
-// Analyze triggers the AI analysis
-func Analyze(logs string, reason string) string {
-	provider := &MockProvider{}
-	analysis, err := provider.AnalyzeLog(context.Background(), logs, reason)
-	if err != nil {
-		return fmt.Sprintf("Failed to analyze: %v", err)
+func (r *Result) String() string {
+	return fmt.Sprintf("⚠️ Root Cause: %s\n🔥 Severity: %s\n✅ Suggested Fix: %s", r.RootCause, r.Severity, r.Fix)
+}
+
+// LocalHeuristicProvider implements basic pattern matching without external API calls.
+// It serves as a fallback or local-dev engine.
+type LocalHeuristicProvider struct{}
+
+func NewLocalProvider() *LocalHeuristicProvider {
+	return &LocalHeuristicProvider{}
+}
+
+func (p *LocalHeuristicProvider) Analyze(ctx context.Context, logs string, reason string) (*Result, error) {
+	// 1. Check for OOM
+	if reason == "OOMKilled" || strings.Contains(logs, "OutOfMemory") || strings.Contains(logs, "java.lang.OutOfMemoryError") {
+		return &Result{
+			RootCause: "Memory Limit Exceeded (OOM)",
+			Severity:  "Critical",
+			Fix:       "Increase `resources.limits.memory` in deployment manifest or debug memory leaks.",
+		}, nil
 	}
-	return analysis
+
+	// 2. Check for Panics
+	if strings.Contains(logs, "panic:") || strings.Contains(logs, "segmentation fault") {
+		return &Result{
+			RootCause: "Application Crash (Panic/Segfault)",
+			Severity:  "High",
+			Fix:       "Check application logs for null pointer dereferences or unhandled exceptions.",
+		}, nil
+	}
+
+	// 3. Check for specific exit codes
+	if strings.Contains(logs, "Exit Code 137") {
+		return &Result{
+			RootCause: "Process Terminated by SIGKILL (likely OOM)",
+			Severity:  "High",
+			Fix:       "Review observability metrics for memory usage spikes.",
+		}, nil
+	}
+
+	// Default
+	return &Result{
+		RootCause: "Unknown Application Error",
+		Severity:  "Medium",
+		Fix:       "Review recent application logs for anomalies.",
+	}, nil
+}
+
+// DefaultAnalyzer returns the configured analysis engine.
+func DefaultAnalyzer() Provider {
+	// TODO: Add logic to switch to OpenAI/Gemini based on env vars
+	return NewLocalProvider()
 }

@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -29,20 +29,20 @@ func main() {
 	// 2. Initialize K8s Client
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		fmt.Printf("Falling back to local kubeconfig: %v\n", err)
+		log.Printf("Using local kubeconfig: %v\n", err)
 		config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
 		if err != nil {
-			panic(err.Error())
+			log.Fatalf("Error loading kubeconfig: %s", err.Error())
 		}
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		panic(err.Error())
+		log.Fatalf("Error creating clientset: %s", err.Error())
 	}
 
-	fmt.Println("🚀 KubeSentinel Starting...")
-	fmt.Println("Connected to Kubernetes Cluster")
+	log.Println("Starting KubeSentinel Controller...")
+	log.Println("Successfully connected to Kubernetes Cluster")
 
 	// 3. Start Controller
 	ctx, cancel := context.WithCancel(context.Background())
@@ -57,5 +57,5 @@ func main() {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	<-sigCh
 
-	fmt.Println("\n🛑 Shutting down KubeSentinel...")
+	log.Println("Shutting down KubeSentinel...")
 }

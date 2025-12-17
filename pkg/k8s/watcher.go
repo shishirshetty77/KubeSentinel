@@ -52,21 +52,26 @@ func (w *Watcher) checkPodHealth(pod *corev1.Pod) {
 		if containerStatus.State.Waiting != nil {
 			reason := containerStatus.State.Waiting.Reason
 			if reason == "CrashLoopBackOff" || reason == "ImagePullBackOff" || reason == "OOMKilled" {
-				fmt.Printf("🚨 DETECTED FAILURE: Pod %s/%s is in %s. Initiating AI Analysis...\n", pod.Namespace, pod.Name, reason)
+				fmt.Printf("🚨 Failure Detected: %s/%s (%s)\n", pod.Namespace, pod.Name, reason)
 
-				// 1. Fetch Logs
 				logs, err := FetchPodLogs(w.clientset, pod, containerStatus.Name)
 				if err != nil {
-					fmt.Printf("⚠️ Failed to fetch logs: %v\n", err)
+					fmt.Printf("Error fetching logs: %v\n", err)
+					continue
 				}
 
-				// 2. AI Analysis
-				// Note: accessing "pkg/analyzer" requires import
-				analysis := "AI Investigation:\n" + analyzer.Analyze(logs, reason)
+				// Analyze
+				engine := analyzer.DefaultAnalyzer()
+				result, err := engine.Analyze(context.Background(), logs, reason)
+				if err != nil {
+					fmt.Printf("Analysis failed: %v\n", err)
+					continue
+				}
 
-				// 3. Notify (K8s Event)
-				// Note: accessing "pkg/notifier" requires import
-				notifier.RecordEvent(w.clientset, pod, analysis)
+				// Notify
+				if err := notifier.RecordEvent(w.clientset, pod, result.String()); err != nil {
+					fmt.Printf("Failed to record event: %v\n", err)
+				}
 			}
 		}
 
